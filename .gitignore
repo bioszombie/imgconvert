@@ -1,10 +1,11 @@
 *.env
 *.jpg
+*.log
 *.png
 *.webp
-*.log
-tmp/
+.DS_Store
 error/
 input/
 log/
 output/
+tmp/
