@@ -1,0 +1,10 @@
+*.env
+*.jpg
+*.png
+*.webp
+*.log
+tmp/
+error/
+input/
+log/
+output/
