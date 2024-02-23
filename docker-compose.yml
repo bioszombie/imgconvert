@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  image-converter:
+    image: image-to-webp
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./tmp:/app/tmp
+      - ./error:/app/error
+      - ./log:/app/log
