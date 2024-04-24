@@ -1,4 +1,4 @@
-FROM debian:bookworm-20240211-slim
+FROM debian:12.5-slim
 
 # Metadata
 LABEL org.opencontainers.image.title="Image to WebP Converter" \
