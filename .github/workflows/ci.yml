@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+  schedule:
+    - cron: "23 13 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e . --no-deps
+          python -m pip check
+
+      - name: Run tests
+        run: python -m pytest --cov=imgconvert --cov-report=term-missing --cov-fail-under=85
+
+      - name: CLI smoke test
+        run: python -m imgconvert --help
+
+  quality:
+    name: Static and dependency checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+
+      - name: Install quality tools
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Compile Python sources
+        run: python -m compileall -q src tests
+
+      - name: Ruff
+        run: ruff check src tests
+
+      - name: Bandit SAST
+        run: bandit -q -r src
+
+      - name: Scan tracked source for potential secrets
+        run: |
+          detect-secrets scan > /tmp/detect-secrets.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('/tmp/detect-secrets.json').read_text())
+          findings = report.get('results', {})
+          if findings:
+              for path in sorted(findings):
+                  for finding in findings[path]:
+                      line = finding.get('line_number', '?')
+                      kind = finding.get('type', 'unknown detector')
+                      print(f'Potential secret: {path}:{line} ({kind})')
+              raise SystemExit('detect-secrets found potential secrets; review before merging')
+          print('No potential secrets detected in tracked source.')
+          PY
+
+      - name: Audit runtime dependencies
+        run: pip-audit -r requirements.txt

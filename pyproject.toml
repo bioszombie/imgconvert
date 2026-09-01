@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=77,<82"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lukeseppe-imgconvert"
+version = "2.0.0"
+description = "Prepare edited photographs as publication-ready WebP sources."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+dynamic = ["dependencies"]
+authors = [{name = "Bioszombie"}]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+]
+
+[project.scripts]
+imgconvert = "imgconvert.cli:main"
+
+[project.urls]
+Repository = "https://github.com/bioszombie/imgconvert"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["imgconvert"]
+omit = ["src/imgconvert/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

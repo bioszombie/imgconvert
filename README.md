@@ -1,68 +1,119 @@
-# Dockerized Image Converter to WebP
+# imgconvert
 
-This project provides a Dockerized solution for converting images to the WebP format, leveraging ImageMagick for image processing. It is designed to monitor a directory for new images, automatically convert them to WebP format with optimized size and quality, and handle image processing errors gracefully.
+`imgconvert` prepares edited photographs for publication on [Lukeseppe.com](https://www.lukeseppe.com/).
 
-## Features
+The old version of this repository was a long-running Bash/ImageMagick daemon in Docker. The current design is intentionally smaller: a local Python CLI processes one or more photographs, writes publication-ready WebP sources, and exits.
 
-- **Automatic Conversion:** Watches for new images in the input directory and converts them to WebP format.
-- **Error Handling:** Moves problematic images to an error directory and logs errors for troubleshooting.
-- **Success Logging:** Logs details about each successful conversion, including file size reduction percentages.
-- **Cleanup on Exit:** Cleans up error and log directories upon Docker container shutdown.
+## What it does
 
-## Prerequisites
+For each input photograph, `imgconvert`:
 
-- Docker
+- validates that the decoded image is a supported single-frame raster format
+- rejects unexpectedly large inputs before they can consume unbounded resources
+- applies EXIF orientation so the published pixels have normal orientation
+- preserves a compatible ICC color profile
+- removes inherited camera/editor EXIF and XMP metadata
+- writes controlled creator and copyright metadata
+- removes GPS/location metadata from the public result
+- downsizes images wider than 3200 px by default without ever upscaling
+- encodes a high-quality WebP source
+- verifies the generated WebP before publication
+- writes atomically and refuses to overwrite an existing output unless explicitly requested
+- leaves the original photograph untouched
 
-## Setup
+The default 3200 px source width gives the website room above its generated 1600 px responsive candidate without committing full camera-resolution files by default. Use `--no-resize` when the original dimensions are intentionally required.
 
-1. **Build the Docker Image**
+## Why Python + Pillow
 
-   Clone this repository and navigate to the project directory. Build the Docker image using the following command:
+This tool is image-publishing glue, not an image-processing service. Python and Pillow provide the required WebP, EXIF, XMP, ICC, orientation, validation, and test support directly without a Docker daemon, filesystem watcher, ImageMagick subprocess, or custom concurrency layer.
 
-   ```sh
-   docker build -t image-to-webp .
-   ```
+Go or Rust would make sense if this became a distributed service or needed a single self-contained binary. That is not the current requirement.
 
-2. **Run the Docker Container**
+## Supported inputs
 
-   Start the container with the following command:
+The publication path accepts decoded JPEG, PNG, TIFF, and WebP files. CMYK and other unusual pixel modes are rejected instead of being silently color-converted with an incompatible profile; export those photographs as RGB from the editing application first.
 
-   ```sh
-   docker run -d \
-     --name image-converter \
-     -v ./input:/app/input \
-     -v ./output:/app/output \
-     -v ./tmp:/app/tmp \
-     -v ./error:/app/error \
-     -v ./log:/app/log \
-     image-to-webp
-   ```
+RAW development is deliberately out of scope. Perform artistic edits and RAW processing in Lightroom, Darktable, Capture One, RawTherapee, or another photo editor before using `imgconvert`.
 
-  For a quick start you may also use the provided docker-compose.yml file. To get the container running using the docker-compose.yml run:
-  ```sh
-   docker compose up -d 
-  ```
+## Install
+
+Python 3.13 or newer is required.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install .
+```
+
+On Windows PowerShell, activate the environment with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+The installed command is `imgconvert`.
 
 ## Usage
 
-Place any images you want to convert into the input directory. The script will automatically convert them to WebP format and place them in the output directory. Errors and logs are managed internally within the container, but you can attach to the container's log to monitor the process:
+Convert one photograph:
 
-```sh
-docker logs -f image-converter
+```bash
+imgconvert ~/Pictures/exports/city-at-night.jpg
 ```
 
-## Customization
+Convert a batch:
 
-You can customize the behavior of the image conversion (e.g., resize dimensions, quality) by modifying the `convert_to_webp.sh` script. After making your changes, rebuild the Docker image for them to take effect.
+```bash
+imgconvert ~/Pictures/exports/*.jpg
+```
 
-## Cleanup
+By default outputs are written under `./publish/` using the input stem and a `.webp` extension.
 
-The Docker container is configured to clean up error logs and problematic images upon shutdown. If you need to manually clean these files, stop the container and then start it again.
+Useful options:
 
-## Contributing
+```bash
+imgconvert photo.jpg --output-dir ./ready
+imgconvert photo.jpg --max-width 2400
+imgconvert photo.jpg --no-resize
+imgconvert photo.jpg --quality 92
+imgconvert photo.jpg --overwrite
+imgconvert photo.jpg --json
+```
 
-Contributions to this project are welcome. Please fork the repository, make your changes, and submit a pull request.
+`--json` prints publication geometry and file-size information that is convenient when updating the website content model.
+
+## Website handoff
+
+`imgconvert` creates the canonical source WebP only. It does **not** create the website's responsive image set.
+
+The intended workflow is:
+
+1. finish artistic edits and export an RGB photograph
+2. run `imgconvert`
+3. visually inspect the generated WebP
+4. copy it into the appropriate `ll_flask_app/www.lukeseppe.com/static/images/<category>/` directory
+5. add/update the photograph and intrinsic dimensions in `site_content.py`
+6. run the website's source validation/tests
+7. let the website build generate its own responsive 480/800/1200/1600 derivatives
+
+See [`docs/publishing-workflow.md`](docs/publishing-workflow.md) for the complete boundary between the two repositories.
+
+## Security model
+
+This is a local manual publishing tool, not an upload service and not a sandbox for hostile internet files. It still applies file-type, byte-size, pixel-count, metadata, and output-integrity controls because image decoders are native-code attack surfaces.
+
+See [`docs/security.md`](docs/security.md).
+
+## Development
+
+```bash
+python -m pip install -r requirements-dev.txt -e . --no-deps
+pytest
+ruff check src tests
+bandit -q -r src
+pip-audit -r requirements.txt
+```
 
 ## License
 
-This project is open-sourced under the MIT License. See the LICENSE file for more details.
+MIT. See [LICENSE](LICENSE).
