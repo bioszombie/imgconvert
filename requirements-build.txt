@@ -1,2 +1,13 @@
+# Closed standalone-release build dependency set.
+# The Package workflow installs this file with --no-deps so every Python
+# package participating in the executable build must be declared here.
 -r requirements.txt
+pip==26.2.1
 PyInstaller==6.22.2
+altgraph==0.17.5
+packaging==26.3
+pyinstaller-hooks-contrib==2026.7
+setuptools==84.0.0
+macholib==1.16.4 ; sys_platform == "darwin"
+pefile==2024.8.26 ; sys_platform == "win32"
+pywin32-ctypes==0.2.3 ; sys_platform == "win32"

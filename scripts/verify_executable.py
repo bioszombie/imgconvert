@@ -6,13 +6,17 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess  # nosec B404 - this verifier intentionally executes the locally built artifact
+import sys
 import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageCms
 
-from imgconvert import __version__
-from imgconvert.converter import (
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from imgconvert import __version__  # noqa: E402
+from imgconvert.converter import (  # noqa: E402
     ARTIST_TAG,
     COPYRIGHT_TAG,
     DEFAULT_CREATOR,

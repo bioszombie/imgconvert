@@ -21,6 +21,31 @@ PyInstaller is not a cross-compiler. Each executable is produced on its own oper
 
 Linux intentionally builds on Ubuntu 22.04 instead of `ubuntu-latest` to avoid unnecessarily raising the glibc baseline as GitHub updates its newest runner image.
 
+## Locked release-build inputs
+
+Standalone executables are built with CPython **3.14.7** on every platform. The Python package closure used by PyInstaller is declared in `requirements-build.txt`:
+
+- the runtime Pillow pin is included from `requirements.txt`
+- pip and PyInstaller are exact-version pins
+- PyInstaller's common transitive dependencies are exact-version pins
+- macOS-only and Windows-only dependencies use explicit environment markers
+- the Package workflow installs the file with `--no-deps`, so pip cannot silently resolve an undeclared transitive package
+- the Package workflow requires binary distributions with `--only-binary=:all:`, so a missing supported wheel fails instead of executing an unexpected source build
+
+After installation, `pip check` verifies that the closed set satisfies the declared dependency relationships. If a future PyInstaller version adds or changes a dependency, package CI fails until the lock is updated deliberately.
+
+The package workflow builds directly from the checked-out `src/` tree. It does not run `pip install .` first, so release packaging does not create a second isolated setuptools environment or an intermediate project wheel.
+
+`pyproject.toml` still pins the setuptools backend because source/development packaging remains supported, but that build path is separate from the standalone executable path.
+
+## Reproducibility boundary
+
+The release workflow fixes the CPython patch level and all Python packages involved in the standalone build. That prevents dependency-version drift between release runs.
+
+It does **not** claim byte-for-byte reproducible executables. GitHub-hosted runner images and their operating-system toolchains are provider-managed inputs, and PyInstaller/native-library output can contain platform-specific build details. A release's SHA-256 checksums and provenance attestations identify the exact artifacts that were produced and published.
+
+If byte-reproducible builds ever become a requirement, the runner/toolchain layer would need a separately controlled build environment rather than overstating what hosted runners provide.
+
 ## What is bundled
 
 The one-file executable contains the PyInstaller bootloader, a Python runtime, `imgconvert`, Pillow, and the native libraries/plugins needed by the selected Pillow wheel.
@@ -33,16 +58,18 @@ PyInstaller one-file executables extract their bundled runtime into a temporary 
 
 The `Package` workflow runs for pull requests, `master`, version tags, and manual dispatches. Every matrix build must:
 
-1. install the pinned release build inputs
-2. build a one-file executable
-3. run `--version` from that executable
-4. use that executable to convert a real JPEG fixture to WebP
-5. verify orientation normalization
-6. verify output geometry and single-frame WebP format
-7. verify controlled Artist/Copyright/XMP metadata
-8. verify private EXIF/GPS absence
-9. verify compatible ICC preservation
-10. upload the proven executable as a workflow artifact
+1. provision CPython 3.14.7
+2. install the exact closed release-build package set without dependency resolution or source builds
+3. pass `pip check`
+4. build a one-file executable directly from the checked-out source tree
+5. run `--version` from that executable
+6. use that executable to convert a real JPEG fixture to WebP
+7. verify orientation normalization
+8. verify output geometry and single-frame WebP format
+9. verify controlled Artist/Copyright/XMP metadata
+10. verify private EXIF/GPS absence
+11. verify compatible ICC preservation
+12. upload the proven executable as a workflow artifact
 
 This specifically tests packaging completeness such as Pillow WebP codec/plugin inclusion.
 
@@ -70,6 +97,8 @@ git push origin v2.1.0
 ```
 
 Do not move/reuse a published version tag. A correction receives a new version.
+
+The release workflow's `master` ancestry test is defense in depth, not a substitute for repository governance. Protect `master` with required CI/package checks so reviewed code cannot be bypassed by a direct push before a release tag is created.
 
 ## Checksums
 
@@ -112,4 +141,4 @@ If broad third-party desktop distribution becomes a goal, add OS-native signing/
 
 There is no self-updater and the executable makes no network request to check for updates. Update deliberately by downloading a newer release, verifying it, and replacing the existing executable.
 
-Dependabot proposes updates to the runtime, build, development, and GitHub Actions dependencies. Those changes must pass both source CI and package CI before they reach a release.
+Dependabot watches the explicitly declared runtime, release-build, development, and GitHub Actions dependencies. An update that changes the release-build dependency closure must update the lock and pass all native package jobs before it can reach a release.
