@@ -1,7 +1,7 @@
 -r requirements.txt
 bandit>=1.9.4,<2
 detect-secrets>=1.5,<2
-pip-audit>=2.9,<4
+pip-audit>=2.10.1,<4
 pytest>=9.1.1,<10
 pytest-cov>=6,<8
 ruff>=0.16.5,<1
