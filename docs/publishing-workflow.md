@@ -36,13 +36,15 @@ The converter does not need to know Flask routes, gallery templates, Docker imag
 
 1. Finish exposure, crop, color, retouching, and RAW development in the photo editor.
 2. Export an RGB JPEG, PNG, TIFF, or WebP.
-3. Run `imgconvert` against the edited export.
-4. Inspect the generated WebP at 100% and at normal browser viewing size.
+3. Run a released `imgconvert` executable against the edited export.
+4. Review the reported dimensions/file-size change and visually inspect the WebP at 100% and normal browser size.
 5. Copy the accepted WebP into the website's active category directory.
-6. Add/update the corresponding entry in `site_content.py` and record the exact width/height printed by `imgconvert`.
+6. Add/update the corresponding `site_content.py` entry and record the exact width/height printed by `imgconvert` (or returned by `--json`).
 7. Run `python scripts/build_responsive_images.py --check` in `ll_flask_app`.
 8. Run the website test suite and normal PR workflow.
 9. The website build creates responsive derivatives; do not commit those derivatives manually.
+
+The publication workflow is intentionally manual at the repository boundary. A photograph is editorial content and should receive a human visual review before it becomes website source material.
 
 ## Source sizing
 
@@ -65,3 +67,7 @@ The website's responsive builder independently applies the same privacy principl
 The output filename uses the input stem. `imgconvert` does not invent descriptive titles or slugs because that is editorial information, not image-processing information.
 
 Rename the edited export before conversion when a descriptive public filename is desired. Batch inputs that would map to the same output stem are rejected rather than silently overwriting one another.
+
+## What does not cross this boundary
+
+`imgconvert` does not modify `ll_flask_app`, commit files, create responsive variants, publish Docker images, or deploy the website. Conversely, the website build does not normalize the photographer's original editor export into the canonical checked-in source.

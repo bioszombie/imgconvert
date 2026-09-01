@@ -1,0 +1,134 @@
+name: Package
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+    tags:
+      - "v[0-9]*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Package (${{ matrix.label }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux x86-64
+            runner: ubuntu-22.04
+            artifact: imgconvert-linux-x86_64
+          - label: Windows x86-64
+            runner: windows-2022
+            artifact: imgconvert-windows-x86_64.exe
+          - label: macOS Intel
+            runner: macos-15-intel
+            artifact: imgconvert-macos-x86_64
+          - label: macOS Apple Silicon
+            runner: macos-15
+            artifact: imgconvert-macos-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+            pyproject.toml
+
+      - name: Install packaging toolchain
+        run: |
+          python -m pip install -r requirements-build.txt
+          python -m pip install . --no-deps
+          python -m pip check
+
+      - name: Build standalone executable
+        run: python scripts/build_executable.py --artifact-name "${{ matrix.artifact }}"
+
+      - name: Verify packaged executable
+        run: python scripts/verify_executable.py "release/${{ matrix.artifact }}"
+
+      - name: Upload packaged executable
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/${{ matrix.artifact }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - name: Validate release tag and source branch
+        shell: bash
+        run: |
+          python scripts/check_release_tag.py "$GITHUB_REF_NAME"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master || {
+            echo "Release commit is not reachable from master." >&2
+            exit 1
+          }
+
+      - name: Download packaged executables
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: imgconvert-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA-256 checksums
+        run: python scripts/write_checksums.py release-assets release-assets/SHA256SUMS
+
+      - name: Attest release binaries and checksums
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-assets/imgconvert-*
+            release-assets/SHA256SUMS
+
+      - name: Publish versioned release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --verify-tag \
+            --generate-notes \
+            --title "imgconvert $GITHUB_REF_NAME"

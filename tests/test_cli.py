@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from imgconvert import __version__
 from imgconvert.cli import main
 
 
@@ -13,6 +14,14 @@ def _save(path: Path, size: tuple[int, int] = (1200, 800)) -> None:
     image = Image.new("RGB", size, "navy")
     image.save(path, format="JPEG")
     image.close()
+
+
+def test_version_reports_package_version(capsys) -> None:
+    with pytest.raises(SystemExit) as error:
+        main(["--version"])
+
+    assert error.value.code == 0
+    assert capsys.readouterr().out.strip() == f"imgconvert {__version__}"
 
 
 def test_json_output_reports_site_geometry(tmp_path: Path, capsys) -> None:

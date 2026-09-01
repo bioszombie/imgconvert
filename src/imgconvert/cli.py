@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from imgconvert import __version__
 from imgconvert.converter import (
     DEFAULT_CREATOR,
     DEFAULT_MAX_WIDTH,
@@ -22,6 +23,11 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="imgconvert",
         description="Prepare edited photographs as publication-ready WebP sources.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument("inputs", nargs="+", type=Path, help="Edited photograph(s) to convert.")
     parser.add_argument(
