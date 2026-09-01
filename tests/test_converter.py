@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+import imgconvert.converter as converter
 from imgconvert.converter import (
     ARTIST_TAG,
     COPYRIGHT_TAG,
@@ -126,6 +127,26 @@ def test_existing_destination_is_not_overwritten_by_default(tmp_path: Path) -> N
         convert_image(source, output)
 
     assert output.read_bytes() == b"existing"
+
+
+def test_destination_appearing_during_conversion_is_not_overwritten(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "photo.jpg"
+    output = tmp_path / "photo.webp"
+    _save_rgb(source)
+    original_validate = converter._validate_published
+
+    def validate_then_race(*args, **kwargs) -> None:
+        original_validate(*args, **kwargs)
+        output.write_bytes(b"competitor")
+
+    monkeypatch.setattr(converter, "_validate_published", validate_then_race)
+
+    with pytest.raises(ConversionError, match="appeared during conversion"):
+        convert_image(source, output)
+
+    assert output.read_bytes() == b"competitor"
 
 
 def test_overwrite_requires_explicit_opt_in(tmp_path: Path) -> None:

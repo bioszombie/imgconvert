@@ -231,9 +231,16 @@ def convert_image(
             expected_icc=compatible_icc,
         )
 
-        if destination.exists() and not overwrite:
-            raise ConversionError(f"output appeared during conversion and was not replaced: {destination}")
-        os.replace(temporary, destination)
+        if overwrite:
+            os.replace(temporary, destination)
+        else:
+            try:
+                os.link(temporary, destination)
+            except FileExistsError as exc:
+                raise ConversionError(
+                    f"output appeared during conversion and was not replaced: {destination}"
+                ) from exc
+            temporary.unlink()
     except ConversionError:
         raise
     except OSError as exc:
