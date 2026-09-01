@@ -6,8 +6,8 @@ import os
 import tempfile
 import warnings
 from dataclasses import dataclass
+from html import escape
 from pathlib import Path
-from xml.sax.saxutils import escape
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -50,8 +50,8 @@ class ConversionResult:
 
 
 def _rights_xmp(creator: str, rights: str) -> bytes:
-    creator_xml = escape(creator)
-    rights_xml = escape(rights)
+    creator_xml = escape(creator, quote=True)
+    rights_xml = escape(rights, quote=True)
     return (
         '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
         '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
