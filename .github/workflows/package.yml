@@ -123,7 +123,7 @@ jobs:
             release-assets/imgconvert-*
             release-assets/SHA256SUMS
 
-      - name: Publish immutable-version release assets
+      - name: Publish versioned release assets
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

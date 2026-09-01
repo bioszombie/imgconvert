@@ -1,73 +1,84 @@
 # imgconvert
 
-`imgconvert` prepares edited photographs for publication on [Lukeseppe.com](https://www.lukeseppe.com/).
+`imgconvert` prepares edited photographs as publication-ready WebP source files for [Lukeseppe.com](https://www.lukeseppe.com/).
 
-The old version of this repository was a long-running Bash/ImageMagick daemon in Docker. The current design is intentionally smaller: a local Python CLI processes one or more photographs, writes publication-ready WebP sources, and exits.
+The normal user experience is a **standalone executable**. Python and Pillow are implementation details used to develop and build the tool; a release user does not need to install Python, manage a virtual environment, run Docker, or install ImageMagick.
 
 ## What it does
 
-For each input photograph, `imgconvert`:
+For each photograph, `imgconvert`:
 
-- validates that the decoded image is a supported single-frame raster format
-- rejects unexpectedly large inputs before they can consume unbounded resources
-- applies EXIF orientation so the published pixels have normal orientation
+- verifies the decoded image is a supported single-frame raster format
+- limits compressed bytes and decoded pixel count
+- applies EXIF orientation to the pixels
 - preserves a compatible ICC color profile
-- removes inherited camera/editor EXIF and XMP metadata
-- writes controlled creator and copyright metadata
-- removes GPS/location metadata from the public result
-- downsizes images wider than 3200 px by default without ever upscaling
-- encodes a high-quality WebP source
-- verifies the generated WebP before publication
-- writes atomically and refuses to overwrite an existing output unless explicitly requested
-- leaves the original photograph untouched
+- removes inherited EXIF/XMP and GPS/location metadata
+- writes controlled creator/copyright metadata
+- downsizes images wider than 3200 px by default and never upscales
+- encodes WebP at quality 90 by default
+- reopens and verifies the generated WebP
+- publishes output atomically and refuses overwrite unless `--overwrite` is explicit
+- never deletes or mutates the original photograph
 
-The default 3200 px source width gives the website room above its generated 1600 px responsive candidate without committing full camera-resolution files by default. Use `--no-resize` when the original dimensions are intentionally required.
+The result is the **canonical source WebP** checked into the photography website. `ll_flask_app` remains responsible for its own responsive 480/800/1200/1600 derivatives.
 
-## Why Python + Pillow
+## Install a release
 
-This tool is image-publishing glue, not an image-processing service. Python and Pillow provide the required WebP, EXIF, XMP, ICC, orientation, validation, and test support directly without a Docker daemon, filesystem watcher, ImageMagick subprocess, or custom concurrency layer.
+Download the asset for your platform from the repository's **Releases** page:
 
-Go or Rust would make sense if this became a distributed service or needed a single self-contained binary. That is not the current requirement.
+| Platform | Release asset |
+| --- | --- |
+| Linux x86-64 | `imgconvert-linux-x86_64` |
+| Windows x86-64 | `imgconvert-windows-x86_64.exe` |
+| macOS Intel | `imgconvert-macos-x86_64` |
+| macOS Apple Silicon | `imgconvert-macos-arm64` |
 
-## Supported inputs
-
-The publication path accepts decoded JPEG, PNG, TIFF, and WebP files. CMYK and other unusual pixel modes are rejected instead of being silently color-converted with an incompatible profile; export those photographs as RGB from the editing application first.
-
-RAW development is deliberately out of scope. Perform artistic edits and RAW processing in Lightroom, Darktable, Capture One, RawTherapee, or another photo editor before using `imgconvert`.
-
-## Install
-
-Python 3.13 or newer is required.
+Linux and macOS downloads need executable permission after download:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install .
+chmod +x imgconvert-linux-x86_64
+./imgconvert-linux-x86_64 --version
 ```
 
-On Windows PowerShell, activate the environment with:
+Optionally rename/install it on your `PATH` as `imgconvert`.
+
+On Windows, run the downloaded `.exe` directly or place it in a directory on `PATH`:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+.\imgconvert-windows-x86_64.exe --version
 ```
 
-The installed command is `imgconvert`.
+Released executables bundle the Python runtime, Pillow, and the application. No system Python environment is required.
+
+> Windows binaries are not Authenticode-signed and macOS binaries are not Apple-notarized. GitHub provenance and checksums establish where the release artifact came from; they are not substitutes for Microsoft/Apple code signing. See [`docs/distribution.md`](docs/distribution.md).
+
+## Verify a release
+
+Every release includes `SHA256SUMS`, and the release binaries/checksum manifest receive GitHub artifact provenance attestations.
+
+With GitHub CLI installed, verify provenance with:
+
+```bash
+gh attestation verify ./imgconvert-linux-x86_64 -R bioszombie/imgconvert
+```
+
+You can also compare the file's SHA-256 digest with `SHA256SUMS` before running it.
 
 ## Usage
 
 Convert one photograph:
 
 ```bash
-imgconvert ~/Pictures/exports/city-at-night.jpg
+imgconvert photo.jpg
 ```
 
-Convert a batch:
+Convert several photographs:
 
 ```bash
-imgconvert ~/Pictures/exports/*.jpg
+imgconvert photo-1.jpg photo-2.jpg photo-3.tif
 ```
 
-By default outputs are written under `./publish/` using the input stem and a `.webp` extension.
+By default output is written to `./publish/` using each input stem and a `.webp` extension.
 
 Useful options:
 
@@ -78,41 +89,63 @@ imgconvert photo.jpg --no-resize
 imgconvert photo.jpg --quality 92
 imgconvert photo.jpg --overwrite
 imgconvert photo.jpg --json
+imgconvert --version
 ```
 
-`--json` prints publication geometry and file-size information that is convenient when updating the website content model.
+`--json` reports exact publication geometry and byte counts, which is useful when updating the website content model.
+
+## Supported inputs
+
+The publication path accepts decoded JPEG, PNG, TIFF, and WebP files. Animated/multi-frame files, symbolic-link inputs, CMYK, and unsupported pixel modes are rejected rather than silently transformed.
+
+RAW development is intentionally out of scope. Finish artistic edits and RAW processing in Lightroom, Darktable, Capture One, RawTherapee, or another editor, then export an RGB publication candidate for `imgconvert`.
 
 ## Website handoff
 
-`imgconvert` creates the canonical source WebP only. It does **not** create the website's responsive image set.
+The intended boundary is:
 
-The intended workflow is:
+```text
+edited RGB photograph
+        |
+        v
+    imgconvert
+        |
+        v
+canonical source WebP
+        |
+        v
+   ll_flask_app
+        |
+        +--> content model / intrinsic geometry
+        +--> responsive derivatives
+        +--> web publication
+```
 
-1. finish artistic edits and export an RGB photograph
-2. run `imgconvert`
-3. visually inspect the generated WebP
-4. copy it into the appropriate `ll_flask_app/www.lukeseppe.com/static/images/<category>/` directory
-5. add/update the photograph and intrinsic dimensions in `site_content.py`
-6. run the website's source validation/tests
-7. let the website build generate its own responsive 480/800/1200/1600 derivatives
+See [`docs/publishing-workflow.md`](docs/publishing-workflow.md) for the complete manual sequence.
 
-See [`docs/publishing-workflow.md`](docs/publishing-workflow.md) for the complete boundary between the two repositories.
+## Development from source
 
-## Security model
-
-This is a local manual publishing tool, not an upload service and not a sandbox for hostile internet files. It still applies file-type, byte-size, pixel-count, metadata, and output-integrity controls because image decoders are native-code attack surfaces.
-
-See [`docs/security.md`](docs/security.md).
-
-## Development
+Developers need Python 3.13 or newer. Release users do not.
 
 ```bash
-python -m pip install -r requirements-dev.txt -e . --no-deps
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+python -m pip install -e . --no-deps
 pytest
-ruff check src tests
-bandit -q -r src
-pip-audit -r requirements.txt
 ```
+
+On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1`.
+
+See [`docs/development.md`](docs/development.md) for local builds, tests, dependency files, and versioning.
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md) — system boundaries and architectural rationale
+- [`docs/publishing-workflow.md`](docs/publishing-workflow.md) — handoff to the photography website
+- [`docs/distribution.md`](docs/distribution.md) — standalone builds, releases, checksums, provenance, and platform signing status
+- [`docs/security.md`](docs/security.md) — threat model and security controls
+- [`docs/development.md`](docs/development.md) — source development and release preparation
 
 ## License
 
