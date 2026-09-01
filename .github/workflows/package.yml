@@ -44,21 +44,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
+      - name: Set up release Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.14"
+          python-version: "3.14.7"
           cache: pip
           cache-dependency-path: |
             requirements.txt
             requirements-build.txt
             pyproject.toml
 
-      - name: Install packaging toolchain
+      - name: Install locked packaging toolchain
         run: |
-          python -m pip install -r requirements-build.txt
-          python -m pip install . --no-deps
+          python -m pip install --no-deps --only-binary=:all: -r requirements-build.txt
           python -m pip check
+          python -m pip --version
 
       - name: Build standalone executable
         run: python scripts/build_executable.py --artifact-name "${{ matrix.artifact }}"
@@ -92,10 +92,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Python
+      - name: Set up release Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.14"
+          python-version: "3.14.7"
 
       - name: Validate release tag and source branch
         shell: bash

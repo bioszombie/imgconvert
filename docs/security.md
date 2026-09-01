@@ -50,9 +50,13 @@ The CLI processes files sequentially. There is no worker pool, background queue,
 
 ## Dependency and build model
 
-Pillow is the only runtime dependency and is exactly pinned in `requirements.txt`. PyInstaller is isolated in `requirements-build.txt`. Development/security tooling is isolated in `requirements-dev.txt`. The setuptools build backend is also version controlled.
+Pillow is the only runtime dependency and is exactly pinned in `requirements.txt`. Development/security tooling is isolated and exactly pinned in `requirements-dev.txt`.
 
-Dependabot watches Python dependencies and GitHub Actions. Source CI audits both runtime and standalone-build requirements. Release scripts are compiled, linted, and included in Bandit SAST because they are part of the trusted build path.
+The standalone release path has a separate closed dependency set in `requirements-build.txt`. It includes exact versions for pip, PyInstaller, PyInstaller's common transitive dependencies, and the macOS/Windows-specific transitive dependencies used by the native package jobs. The Package workflow installs that set with `--no-deps` and `--only-binary=:all:` so an undeclared dependency or missing wheel fails closed instead of being resolved or built implicitly.
+
+Standalone builds use exact CPython 3.14.7. They package directly from the checked-out `src/` tree, so the release path does not create an isolated project-build environment or an intermediate application wheel. `pip check` verifies the installed locked set before PyInstaller runs.
+
+Dependabot watches Python dependencies and GitHub Actions. Source CI audits runtime and standalone-build requirements. Release scripts are compiled, linted, and included in Bandit SAST because they are part of the trusted build path.
 
 ## Standalone executable boundary
 
@@ -66,9 +70,11 @@ PyInstaller one-file executables extract their runtime into a temporary director
 
 Stable release tags must exactly match the internal semantic version and point to a commit reachable from `master`. All platform builds must succeed before release publication.
 
-Tagged releases include SHA-256 checksums and GitHub/Sigstore build-provenance attestations. Attestations bind artifact hashes to the repository/workflow that produced them; they are evidence of provenance, **not a claim that the binary is vulnerability-free**.
+The Python portion of the standalone build is version-locked, but the project does not claim byte-for-byte reproducibility. GitHub-hosted runner images and their operating-system toolchains remain provider-managed inputs. Published checksums identify the exact release artifacts, while GitHub/Sigstore attestations bind those artifact hashes to the repository and workflow that produced them.
 
 Release workflow write permissions are limited to the release job. Ordinary source/package build jobs remain read-only.
+
+Repository branch protection is an external governance control, not something a workflow can safely emulate. `master` should require the source and package checks before merge and should reject force-push/deletion bypasses. The release workflow's `master` ancestry check is defense in depth and must not be interpreted as proof that a commit passed review.
 
 ## OS signing
 
