@@ -72,10 +72,12 @@ For a release-bearing change:
 4. open a PR
 5. require source CI and all Standalone build checks to pass
 6. merge to `master`
-7. create the exactly matching `vMAJOR.MINOR.PATCH` tag
-8. let the tag-triggered **Build & Release** workflow create the GitHub Release
+7. publish from the **Build & Release** workflow on `master` by entering the matching version without the `v` prefix, or create/push the exactly matching `vMAJOR.MINOR.PATCH` tag from a local Git client
+8. let **Build & Release** create the checksums, attestations, and GitHub Release
 
-The workflow rejects mismatched or non-stable version tags.
+For a browser/manual release, all four standalone builds complete before the workflow creates the version tag. If a build fails, no release tag is created. The workflow rejects mismatched, duplicate, or non-stable version tags.
+
+A local tag push remains supported and follows the same release validation/publishing path.
 
 ## Release scripts
 

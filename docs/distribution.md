@@ -14,7 +14,7 @@ Python packaging remains useful for development, but it is not the normal instal
 - **GitHub Releases** are the durable, versioned distribution channel for end users.
 - **GitHub Packages** is intentionally unused. The project does not publish a container, npm package, NuGet package, or other registry-native artifact merely to populate the Packages section.
 
-A successful pull request or `master` build therefore does not create a public downloadable release. Durable publication happens only from a valid version tag after all release gates pass.
+A successful pull request or `master` build therefore does not create a public downloadable release. Durable publication happens only after the release gates pass and a valid immutable version tag exists.
 
 ## Supported release assets
 
@@ -89,14 +89,35 @@ Stable releases use tags in the form `vMAJOR.MINOR.PATCH`.
 
 The release job fails unless:
 
-- the tag is valid stable SemVer
-- the tag exactly matches `imgconvert.__version__`
-- the tagged commit is reachable from `master`
+- the requested/tagged version is valid stable SemVer
+- the version exactly matches `imgconvert.__version__`
+- the release commit is reachable from `master`
 - every platform Standalone build job succeeds
 
 After those gates, the workflow downloads the four independently built executables, writes `SHA256SUMS`, creates GitHub build-provenance attestations, and creates the GitHub Release.
 
-A normal release sequence is:
+### Browser/manual release
+
+A release can be started without a local Git workstation:
+
+1. open **Actions** in GitHub
+2. select **Build & Release**
+3. choose **Run workflow**
+4. select the `master` branch
+5. enter the version without the `v` prefix, for example `2.1.0`
+6. run the workflow
+
+The four standalone builds execute first. Only after all of them succeed does the release job create `v2.1.0` at the exact `master` commit used by the workflow, generate checksums/attestations, and publish the GitHub Release.
+
+The tag is deliberately created late. A failed platform build therefore cannot leave behind a release tag with no validated release artifacts.
+
+GitHub suppresses ordinary follow-on workflow events caused by the repository `GITHUB_TOKEN`, so the manual path does not depend on a second tag-triggered run. The same Build & Release run creates the tag and continues directly into publication.
+
+If the requested tag already exists, manual publication fails instead of moving or reusing it.
+
+### Local tag release
+
+Creating a release from a local Git client remains supported:
 
 ```bash
 # after the version-bearing PR is merged and master checks are green
@@ -106,9 +127,11 @@ git tag v2.1.0
 git push origin v2.1.0
 ```
 
+A tag push runs the same four-platform Build & Release pipeline and publishes only after all release gates pass.
+
 Do not move/reuse a published version tag. A correction receives a new version.
 
-The release workflow's `master` ancestry test is defense in depth, not a substitute for repository governance. Protect `master` with required source/standalone-build checks so reviewed code cannot be bypassed by a direct push before a release tag is created.
+The release workflow's `master` ancestry test is defense in depth, not a substitute for repository governance. Protect `master` with required source/standalone-build checks so reviewed code cannot be bypassed by a direct push before a release is created.
 
 ## Checksums
 
@@ -126,7 +149,7 @@ Get-FileHash .\imgconvert-windows-x86_64.exe -Algorithm SHA256
 
 ## Build provenance
 
-Tagged releases use GitHub artifact attestations backed by Sigstore. The attestation links the artifact digest to the GitHub repository/workflow that built it.
+Releases use GitHub artifact attestations backed by Sigstore. The attestation links the artifact digest to the GitHub repository/workflow that built it.
 
 Verify online with GitHub CLI:
 

@@ -70,11 +70,17 @@ PyInstaller one-file executables extract their runtime into a temporary director
 
 Stable release tags must exactly match the internal semantic version and point to a commit reachable from `master`. All platform Standalone build jobs must succeed before release publication.
 
+Browser/manual releases are dispatched from `master` with a requested semantic version. The workflow validates the requested version against `imgconvert.__version__`, runs all four standalone builds, and only then creates the matching version tag on the exact workflow commit. This ordering prevents a failed build from leaving behind a release tag without validated release artifacts.
+
+Local version-tag pushes remain supported. Both release paths converge on the same checksum, attestation, and GitHub Release publication steps.
+
 The Python portion of the standalone build is version-locked, but the project does not claim byte-for-byte reproducibility. GitHub-hosted runner images and their operating-system toolchains remain provider-managed inputs. Published checksums identify the exact release artifacts, while GitHub/Sigstore attestations bind those artifact hashes to the repository and workflow that produced them.
 
-Release workflow write permissions are limited to the release job. Ordinary source/standalone-build jobs remain read-only.
+Release workflow write permissions are limited to the release job. Ordinary source/standalone-build jobs remain read-only. The manual release path uses the repository `GITHUB_TOKEN`; no long-lived personal access token or release secret is required.
 
 Repository branch protection is an external governance control, not something a workflow can safely emulate. `master` should require pull requests plus the source and Standalone build checks before merge and should reject force-push/deletion bypasses. The release workflow's `master` ancestry check is defense in depth and must not be interpreted as proof that a commit passed review.
+
+Published version tags are immutable by policy: an existing tag is never moved or reused. A correction receives a new semantic version.
 
 GitHub Releases are the durable distribution channel. Actions artifacts are temporary CI evidence/handoff objects. GitHub Packages is intentionally not part of the release design because this project does not need a registry-native package format.
 
