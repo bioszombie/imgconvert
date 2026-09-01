@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
+import subprocess  # nosec B404 - this verifier intentionally executes the locally built artifact
 import tempfile
 from pathlib import Path
 
@@ -33,7 +33,8 @@ def main() -> int:
     if not executable.is_file():
         raise SystemExit(f"packaged executable does not exist: {executable}")
 
-    version = subprocess.run(
+    # The executable is the CI-produced artifact under test; no shell is involved.
+    version = subprocess.run(  # nosec B603
         [str(executable), "--version"],
         check=True,
         capture_output=True,
@@ -57,7 +58,8 @@ def main() -> int:
         image.save(source, format="JPEG", quality=95, exif=exif, icc_profile=icc)
         image.close()
 
-        completed = subprocess.run(
+        # All argv values are locally constructed test paths/options; shell=False is the default.
+        completed = subprocess.run(  # nosec B603
             [
                 str(executable),
                 str(source),
