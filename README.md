@@ -33,6 +33,8 @@ Download the asset for your platform from the repository's **Releases** page:
 | macOS Intel | `imgconvert-macos-x86_64` |
 | macOS Apple Silicon | `imgconvert-macos-arm64` |
 
+GitHub **Releases**, not GitHub Packages, are the distribution channel for `imgconvert`. The Build & Release workflow uses GitHub Actions artifacts only as temporary CI handoff/evidence between jobs; durable user downloads live on the versioned Release.
+
 Linux and macOS downloads need executable permission after download:
 
 ```bash

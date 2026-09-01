@@ -52,15 +52,15 @@ The CLI processes files sequentially. There is no worker pool, background queue,
 
 Pillow is the only runtime dependency and is exactly pinned in `requirements.txt`. Development/security tooling is isolated and exactly pinned in `requirements-dev.txt`.
 
-The standalone release path has a separate closed dependency set in `requirements-build.txt`. It includes exact versions for pip, PyInstaller, PyInstaller's common transitive dependencies, and the macOS/Windows-specific transitive dependencies used by the native package jobs. The Package workflow installs that set with `--no-deps` and `--only-binary=:all:` so an undeclared dependency or missing wheel fails closed instead of being resolved or built implicitly.
+The standalone release path has a separate closed dependency set in `requirements-build.txt`. It includes exact versions for pip, PyInstaller, PyInstaller's common transitive dependencies, and the macOS/Windows-specific transitive dependencies used by the native Standalone build jobs. The Build & Release workflow installs that set with `--no-deps` and `--only-binary=:all:` so an undeclared dependency or missing wheel fails closed instead of being resolved or built implicitly.
 
-Standalone builds use exact CPython 3.14.7. They package directly from the checked-out `src/` tree, so the release path does not create an isolated project-build environment or an intermediate application wheel. `pip check` verifies the installed locked set before PyInstaller runs.
+Standalone builds use exact CPython 3.14.7. They build directly from the checked-out `src/` tree, so the release path does not create an isolated project-build environment or an intermediate application wheel. `pip check` verifies the installed locked set before PyInstaller runs.
 
 Dependabot watches Python dependencies and GitHub Actions. Source CI audits runtime and standalone-build requirements. Release scripts are compiled, linted, and included in Bandit SAST because they are part of the trusted build path.
 
 ## Standalone executable boundary
 
-Release executables are built independently on Linux, Windows, macOS Intel, and macOS Apple Silicon. Each packaged executable is executed in CI against a real JPEG-to-WebP fixture and its output contract is revalidated.
+Release executables are built independently on Linux, Windows, macOS Intel, and macOS Apple Silicon. Each standalone executable is executed in CI against a real JPEG-to-WebP fixture and its output contract is revalidated.
 
 PyInstaller bundles a Python runtime and dependencies. This removes target-machine Python drift; it does not transform Python into memory-safe native application code or eliminate vulnerabilities in Pillow/native codecs.
 
@@ -68,13 +68,15 @@ PyInstaller one-file executables extract their runtime into a temporary director
 
 ## Release supply chain
 
-Stable release tags must exactly match the internal semantic version and point to a commit reachable from `master`. All platform builds must succeed before release publication.
+Stable release tags must exactly match the internal semantic version and point to a commit reachable from `master`. All platform Standalone build jobs must succeed before release publication.
 
 The Python portion of the standalone build is version-locked, but the project does not claim byte-for-byte reproducibility. GitHub-hosted runner images and their operating-system toolchains remain provider-managed inputs. Published checksums identify the exact release artifacts, while GitHub/Sigstore attestations bind those artifact hashes to the repository and workflow that produced them.
 
-Release workflow write permissions are limited to the release job. Ordinary source/package build jobs remain read-only.
+Release workflow write permissions are limited to the release job. Ordinary source/standalone-build jobs remain read-only.
 
-Repository branch protection is an external governance control, not something a workflow can safely emulate. `master` should require the source and package checks before merge and should reject force-push/deletion bypasses. The release workflow's `master` ancestry check is defense in depth and must not be interpreted as proof that a commit passed review.
+Repository branch protection is an external governance control, not something a workflow can safely emulate. `master` should require pull requests plus the source and Standalone build checks before merge and should reject force-push/deletion bypasses. The release workflow's `master` ancestry check is defense in depth and must not be interpreted as proof that a commit passed review.
+
+GitHub Releases are the durable distribution channel. Actions artifacts are temporary CI evidence/handoff objects. GitHub Packages is intentionally not part of the release design because this project does not need a registry-native package format.
 
 ## OS signing
 
