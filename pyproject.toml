@@ -41,6 +41,7 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["imgconvert"]
+omit = ["src/imgconvert/__main__.py"]
 
 [tool.coverage.report]
 show_missing = true

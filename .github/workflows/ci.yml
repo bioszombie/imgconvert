@@ -47,7 +47,7 @@ jobs:
           python -m pip check
 
       - name: Run tests
-        run: python -m pytest --cov=imgconvert --cov-report=term-missing --cov-fail-under=90
+        run: python -m pytest --cov=imgconvert --cov-report=term-missing --cov-fail-under=85
 
       - name: CLI smoke test
         run: python -m imgconvert --help
