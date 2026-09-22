@@ -3,7 +3,7 @@
 # package participating in the executable build must be declared here.
 -r requirements.txt
 pip==26.2.1
-PyInstaller==6.22.2
+PyInstaller==6.22.3
 altgraph==0.17.5
 packaging==26.3
 pyinstaller-hooks-contrib==2026.7
