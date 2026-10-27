@@ -2,7 +2,7 @@
 # The Package workflow installs this file with --no-deps so every Python
 # package participating in the executable build must be declared here.
 -r requirements.txt
-pip==26.2.1
+pip==26.2.2
 PyInstaller==6.22.3
 altgraph==0.17.5
 packaging==26.3
